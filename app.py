@@ -30,31 +30,43 @@ def set_view(view_name: str):
     """Sets the current view in the session state."""
     st.session_state.current_view = view_name
 
+# *** FIXED AND SIMPLIFIED add_new_event ***
 def add_new_event(event_data: Dict[str, Any]):
-    """Adds a new event to the session state."""
-    # Convert types
-    try:
-        attendees = int(event_data['attendees'])
-        budget = float(event_data['budget'])
-    except ValueError:
-        st.error("Please enter valid numbers for Attendees and Budget.")
-        return False
+    """
+    Adds a new event to the session state.
+    Assumes event_data fields for 'attendees' and 'budget' are already
+    of the correct numeric type from st.number_input.
+    """
+    # Check for required fields again (though form submission logic also checks)
+    if not event_data['name'] or not event_data['location']:
+        st.error("Event Name and Location are required.")
+        return
 
+    # Create the datetime object for sorting
+    try:
+        datetime_obj = datetime.strptime(
+            f"{event_data['date']} {event_data['time']}", 
+            '%Y-%m-%d %H:%M:%S' # Use %H:%M:%S as st.time_input returns a time object with seconds
+        )
+    except ValueError:
+        st.error("Error creating event datetime. Check date and time format.")
+        return False
+        
     new_event = {
         'id': generate_unique_id(),
         'name': event_data['name'],
         'date': event_data['date'],
         'time': event_data['time'],
         'location': event_data['location'],
-        'attendees': attendees,
-        'budget': budget,
-        'datetime_obj': datetime.strptime(f"{event_data['date']} {event_data['time']}", '%Y-%m-%d %H:%M')
+        'attendees': event_data['attendees'], # Directly use the numeric value
+        'budget': event_data['budget'],       # Directly use the numeric value
+        'datetime_obj': datetime_obj
     }
+    
     st.session_state.events.append(new_event)
     st.success(f"Event '{new_event['name']}' added successfully!")
-    # Clear form inputs after successful submission by setting new key value
-    st.session_state['event-name'] = ""
-    st.session_state['event-location'] = ""
+    # Streamlit forms handle clearing, but success message needs a rerun
+    st.rerun() 
 
 def delete_event(event_id: str):
     """Deletes an event by ID from the session state."""
@@ -63,6 +75,7 @@ def delete_event(event_id: str):
     
     if len(st.session_state.events) < initial_length:
         st.toast("Event deleted successfully. 🗑️", icon='✅')
+        st.rerun() # Rerun to update the displayed list
     else:
         st.error("Error: Event not found or deletion failed.")
         
@@ -76,7 +89,7 @@ def get_events_dataframe(events: List[Dict[str, Any]], sort_by: str = 'date-asc'
     df = pd.DataFrame(events)
     
     # Prepare display columns
-    df['Date/Time'] = df['date'] + ' at ' + df['time']
+    df['Date/Time'] = df['date'] + ' at ' + df['time'].str[:5] # Truncate time to HH:MM for display
     df['Budget (USD)'] = df['budget'].apply(lambda x: f"${x:,.2f}")
     df['Attendees'] = df['attendees'].apply(lambda x: f"{x:,}")
     # ID is kept for internal reference, not displayed
@@ -105,6 +118,7 @@ def add_event_view():
     
     # Use st.form to ensure all inputs are cleared on submission
     with st.form("add_event_form"):
+        # Initial values can be set here if not using keys to persist state
         st.text_input("Event Name", key="event-name")
         
         col_dt_1, col_dt_2 = st.columns(2)
@@ -126,17 +140,18 @@ def add_event_view():
         if submitted:
             # Gather data from session state keys used above
             event_data = {
+                # Convert date/time objects to string for consistent storage
                 'name': st.session_state['event-name'],
                 'date': str(st.session_state['event-date']),
                 'time': str(st.session_state['event-time']),
                 'location': st.session_state['event-location'],
+                # number_input returns int/float, so pass them directly
                 'attendees': st.session_state['event-attendees'],
                 'budget': st.session_state['event-budget'],
             }
             if event_data['name'] and event_data['location']:
+                # The function now handles the rerun to update the UI
                 add_new_event(event_data)
-                # Since we used st.form, the values are reset. No need for manual clear.
-                st.rerun() # Rerun to show success message and clear form inputs immediately
             else:
                 st.error("Event Name and Location are required.")
 
@@ -182,7 +197,6 @@ def view_events_view():
             st.markdown("#### Delete Actions")
             
             # Create a separate loop to generate delete buttons
-            # This is more stable than using st.data_editor for actions
             for index, row in events_df.iterrows():
                 col_name, col_delete = st.columns([4, 1])
                 with col_name:
@@ -218,13 +232,16 @@ def search_events_view():
     with col3:
         # Add some space for vertical alignment
         st.markdown("<div style='height: 27px;'></div>", unsafe_allow_html=True) 
+        # Set a key for the button to check if it was clicked
         st.button("Search", key="execute-search")
     
     st.markdown("---")
     st.markdown("### Search Results")
 
-    search_clicked = st.session_state.get("execute-search", False)
+    # Check the button's state in session state
+    search_clicked = st.session_state.get("execute-search", False) 
     
+    # Only run search logic if the button was clicked AND a term is entered
     if search_clicked and st.session_state['search-term']:
         term_lower = st.session_state['search-term'].lower().strip()
         search_field = st.session_state['search-field']
@@ -259,6 +276,7 @@ with st.sidebar:
     
     # Define a button style helper
     def nav_button(label, view_id, icon):
+        # Use on_click to set the view and st.rerun to refresh immediately
         st.button(
             f"{icon} {label}", 
             on_click=set_view, args=(view_id,), 
@@ -281,3 +299,5 @@ elif st.session_state.current_view == 'view-events':
     view_events_view()
 elif st.session_state.current_view == 'search-events':
     search_events_view()
+
+# *** REMOVED THE FAILING LINE: add_new_event(event_data) ***
