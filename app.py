@@ -142,7 +142,8 @@ def add_event_view():
     st.title("➕ Add New Event")
     st.markdown("---")
     
-    with st.form("add_event_form", clear_on_submit=True):
+    # FIX APPLIED HERE: Changed "key='add_event_form_key" to key='add_event_form_key'
+    with st.form(key='add_event_form_key', clear_on_submit=True):
         st.subheader("Event Details")
         
         col1, col2 = st.columns(2)
@@ -298,7 +299,8 @@ def view_sort_events_view():
     event_id_to_delete = st.text_input("Event ID to Delete", placeholder="Paste event ID here")
     
     if st.button("Delete Selected Event", type="secondary", help="Deletes the event permanently"):
-        if event_id_to_delete in df_to_sort['id'].values:
+        # We need to use the original list of IDs for a valid check
+        if event_id_to_delete in [e['id'] for e in st.session_state.events]:
             delete_event(event_id_to_delete)
         else:
             st.error("Invalid Event ID or event not found.")
