@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Management System</title>
+    <title>Event Management System (Local Storage)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -55,7 +55,7 @@
     </aside>
 
     <main class="flex-1 p-8 overflow-y-auto">
-        <h1 class="text-4xl font-extrabold mb-6 text-white">Event Management System</h1>
+        <h1 class="text-4xl font-extrabold mb-6 text-white">Event Management System (Local Storage)</h1>
 
         <div id="status-message" class="mb-6 hidden p-4 rounded-lg text-sm transition-all duration-300"></div>
 
@@ -167,36 +167,48 @@
 
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, addDoc, deleteDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // IMPORTANT: Replace these placeholder values with your actual Firebase config
-        // Get these from your Firebase project settings.
-        const firebaseConfig = {
-             apiKey: "YOUR_API_KEY",
-             authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-             projectId: "YOUR_PROJECT_ID",
-             storageBucket: "YOUR_PROJECT_ID.appspot.com",
-             messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-             appId: "YOUR_APP_ID"
-        };
-        const initialAuthToken = null; // Set to a token if needed, otherwise 'null' for anonymous sign-in
-        const appId = firebaseConfig.appId || 'default-app-id';
-
+        // Remove Firebase imports as we are using Local Storage
+        // import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        // import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // import { getFirestore, doc, addDoc, deleteDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global State
-        let db;
-        let auth;
-        let userId = null;
-        let isAuthReady = false;
+        const LOCAL_STORAGE_KEY = 'eventManagerEvents';
         let allEvents = []; // Cache of all events for in-memory searching/sorting
-
-        const EVENTS_COLLECTION_PATH = `artifacts/${appId}/public/data/events`;
 
         // Utility Functions
         const $ = (selector) => document.querySelector(selector);
         const $$ = (selector) => document.querySelectorAll(selector);
+
+        function generateUniqueId() {
+            return Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+        }
+
+        function saveEventsToLocalStorage() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(allEvents));
+            } catch (e) {
+                console.error("Error saving to Local Storage:", e);
+                showMessage("Warning: Could not save events to your browser's storage.", 'error');
+            }
+        }
+
+        function loadEventsFromLocalStorage() {
+            try {
+                const storedEvents = localStorage.getItem(LOCAL_STORAGE_KEY);
+                allEvents = storedEvents ? JSON.parse(storedEvents) : [];
+                // Ensure attendees and budget are numbers for sorting/display
+                allEvents.forEach(event => {
+                    event.attendees = Number(event.attendees);
+                    event.budget = Number(event.budget);
+                });
+                console.log("Events loaded:", allEvents);
+            } catch (e) {
+                console.error("Error loading from Local Storage:", e);
+                showMessage("Error loading events from storage. Starting fresh.", 'error');
+                allEvents = [];
+            }
+        }
 
         function showMessage(message, type = 'info') {
             const statusDiv = $('#status-message');
@@ -246,82 +258,26 @@
             }
         }
 
-        // --- Firebase Core Logic ---
-
-        async function initFirebase() {
-            // setLogLevel('debug'); // Enable debug logging for console
-            try {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                // Set up Auth State Listener
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        isAuthReady = true;
-                        showMessage(`Signed in successfully! User ID: ${userId.substring(0, 8)}...`, 'success');
-                        // Start listening for events once authenticated
-                        listenForEvents();
-                    } else {
-                        // Attempt to sign in
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            // Fallback to anonymous sign-in
-                            await signInAnonymously(auth);
-                        }
-                    }
-                });
-
-            } catch (error) {
-                console.error("Firebase initialization or authentication failed:", error);
-                showMessage(`Error initializing Firebase: ${error.message}`, 'error');
-                isAuthReady = true; // Still set to true to avoid perpetual loading, but without data.
-            }
-        }
+        // --- Event Management Functions (Local Storage implementation) ---
 
         function listenForEvents() {
-            if (!db || !isAuthReady) return;
-
-            const eventsRef = collection(db, EVENTS_COLLECTION_PATH);
-            const q = query(eventsRef);
-
-            onSnapshot(q, (snapshot) => {
-                allEvents = [];
-                snapshot.forEach((doc) => {
-                    allEvents.push({ id: doc.id, ...doc.data() });
-                });
-                console.log("Events fetched:", allEvents);
-
-                // Only render if the user is in the view-events tab
-                if ($('#view-events:not(.hidden)')) {
-                    renderEventsTable(allEvents, $('#sort-by').value);
-                }
-            }, (error) => {
-                console.error("Error listening to events:", error);
-                showMessage("Failed to load events in real-time.", 'error');
-            });
+            // In Local Storage, this simply means loading the data once on init
+            loadEventsFromLocalStorage();
         }
 
-
-        // --- Event Management Functions ---
-
         async function addEvent(eventData) {
-            if (!db || !userId) {
-                showMessage("Authentication not complete. Please wait.", 'error');
-                return;
-            }
             try {
-                const eventsRef = collection(db, EVENTS_COLLECTION_PATH);
-                await addDoc(eventsRef, {
+                const newEvent = {
+                    id: generateUniqueId(), // Create a unique ID
                     ...eventData,
                     attendees: Number(eventData.attendees),
                     budget: Number(eventData.budget),
-                    organizerId: userId,
                     createdAt: new Date().toISOString()
-                });
-                showMessage(`Event '${eventData.name}' added successfully!`, 'success');
+                };
+
+                allEvents.push(newEvent);
+                saveEventsToLocalStorage();
+                showMessage(`Event '${newEvent.name}' added and saved locally!`, 'success');
                 $('#add-event-form').reset();
             } catch (error) {
                 console.error("Error adding event:", error);
@@ -330,13 +286,18 @@
         }
 
         async function deleteEvent(eventId) {
-            if (!db || !userId) return showMessage("Authentication required.", 'error');
-            try {
-                await deleteDoc(doc(db, EVENTS_COLLECTION_PATH, eventId));
+            const initialLength = allEvents.length;
+            allEvents = allEvents.filter(event => event.id !== eventId);
+
+            if (allEvents.length < initialLength) {
+                saveEventsToLocalStorage();
                 showMessage("Event deleted successfully.", 'success');
-            } catch (error) {
-                console.error("Error deleting event:", error);
-                showMessage(`Error deleting event: ${error.message}`, 'error');
+                // Re-render the table after deletion if we are on the view-events page
+                if ($('#view-events:not(.hidden)')) {
+                    renderEventsTable(allEvents, $('#sort-by').value);
+                }
+            } else {
+                showMessage("Error: Event not found or deletion failed.", 'error');
             }
         }
 
@@ -498,7 +459,7 @@
         // --- Event Listeners and Initialization ---
 
         window.onload = () => {
-            initFirebase();
+            listenForEvents(); // Load events from Local Storage
             switchView('add-event'); // Default view on load
 
             // Sidebar navigation
