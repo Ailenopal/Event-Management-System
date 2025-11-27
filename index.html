@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Event Management System</title>
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Lucide icons for a clean look -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         /* Custom scrollbar for dark mode */
@@ -27,7 +25,6 @@
 </head>
 <body class="bg-gray-900 text-gray-100 font-sans min-h-screen flex antialiased">
 
-    <!-- Sidebar Navigation -->
     <aside class="w-64 bg-gray-800 flex flex-col p-4 shadow-xl border-r border-gray-700">
         <div class="text-2xl font-bold text-indigo-400 mb-8">
             Event Manager
@@ -57,16 +54,12 @@
         </nav>
     </aside>
 
-    <!-- Main Content Area -->
     <main class="flex-1 p-8 overflow-y-auto">
         <h1 class="text-4xl font-extrabold mb-6 text-white">Event Management System</h1>
 
-        <!-- Status/Message Area -->
         <div id="status-message" class="mb-6 hidden p-4 rounded-lg text-sm transition-all duration-300"></div>
 
-        <!-- View Containers -->
         <div id="content-area">
-            <!-- Add Event View -->
             <section id="add-event" class="view hidden">
                 <h2 class="text-3xl font-semibold mb-6 text-gray-200">Add New Event</h2>
                 <form id="add-event-form" class="space-y-4 max-w-lg">
@@ -102,7 +95,6 @@
                 </form>
             </section>
 
-            <!-- View & Sort Events View -->
             <section id="view-events" class="view hidden">
                 <h2 class="text-3xl font-semibold mb-6 text-gray-200">Manage & Sort Events</h2>
                 <div class="flex items-center space-x-4 mb-6">
@@ -129,14 +121,12 @@
                             </tr>
                         </thead>
                         <tbody id="events-table-body" class="bg-gray-800 divide-y divide-gray-700">
-                            <!-- Events will be injected here by JavaScript -->
                             <tr><td colspan="7" class="text-center py-4 text-gray-500">Loading events...</td></tr>
                         </tbody>
                     </table>
                 </div>
             </section>
 
-            <!-- Search Events View -->
             <section id="search-events" class="view hidden">
                 <h2 class="text-3xl font-semibold mb-6 text-gray-200">Search Events</h2>
                 <div class="space-y-4 max-w-lg mb-6">
@@ -164,7 +154,6 @@
         </div>
     </main>
 
-    <!-- Modal for Confirmation/Editing (Simple Dialog) -->
     <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center p-4 z-50">
         <div class="bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-2xl border border-gray-700">
             <h3 id="modal-title" class="text-xl font-bold mb-4 text-white">Confirm Deletion</h3>
@@ -177,11 +166,24 @@
     </div>
 
 
-    <!-- Firebase Scripts -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, orderBy, limit, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, addDoc, deleteDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // IMPORTANT: Replace these placeholder values with your actual Firebase config
+        // Get these from your Firebase project settings.
+        const firebaseConfig = {
+             apiKey: "YOUR_API_KEY",
+             authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+             projectId: "YOUR_PROJECT_ID",
+             storageBucket: "YOUR_PROJECT_ID.appspot.com",
+             messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+             appId: "YOUR_APP_ID"
+        };
+        const initialAuthToken = null; // Set to a token if needed, otherwise 'null' for anonymous sign-in
+        const appId = firebaseConfig.appId || 'default-app-id';
+
 
         // Global State
         let db;
@@ -189,11 +191,6 @@
         let userId = null;
         let isAuthReady = false;
         let allEvents = []; // Cache of all events for in-memory searching/sorting
-
-        // Globals from Canvas Environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         const EVENTS_COLLECTION_PATH = `artifacts/${appId}/public/data/events`;
 
@@ -252,7 +249,7 @@
         // --- Firebase Core Logic ---
 
         async function initFirebase() {
-            setLogLevel('debug'); // Enable debug logging for console
+            // setLogLevel('debug'); // Enable debug logging for console
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -288,8 +285,6 @@
             if (!db || !isAuthReady) return;
 
             const eventsRef = collection(db, EVENTS_COLLECTION_PATH);
-            // Since we need to sort in-memory based on different user choices, we fetch all.
-            // For a real large-scale app, a server-side query would be better, but we stick to client-side sorting as required.
             const q = query(eventsRef);
 
             onSnapshot(q, (snapshot) => {
