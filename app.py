@@ -131,9 +131,9 @@ def add_event_view():
 
         col_num_1, col_num_2 = st.columns(2)
         with col_num_1:
-            st.number_input("Expected Attendees", min_value=1, value=0, step=1, key="event-attendees")
+            st.number_input("Expected Attendees", min_value=1, value=100, step=1, key="event-attendees")
         with col_num_2:
-            st.number_input("Budget (PESO)", min_value=0.0, value=0.00, step=0.01, format="%.2f", key="event-budget")
+            st.number_input("Budget (PESO)", min_value=0.0, value=10.00, step=0.01, format="%.2f", key="event-budget")
             
         submitted = st.form_submit_button("Add Event", type="primary", use_container_width=True)
         
@@ -301,6 +301,7 @@ elif st.session_state.current_view == 'search-events':
     search_events_view()
 
 # *** REMOVED THE FAILING LINE: add_new_event(event_data) ***
+
 
 
 
