@@ -90,7 +90,7 @@ def get_events_dataframe(events: List[Dict[str, Any]], sort_by: str = 'date-asc'
     
     # Prepare display columns
     df['Date/Time'] = df['date'] + ' at ' + df['time'].str[:5] # Truncate time to HH:MM for display
-    df['Budget (USD)'] = df['budget'].apply(lambda x: f"${x:,.2f}")
+    df['Budget (PESO)'] = df['budget'].apply(lambda x: f"${x:,.2f}")
     df['Attendees'] = df['attendees'].apply(lambda x: f"{x:,}")
     # ID is kept for internal reference, not displayed
     df['Sort_Key'] = df['datetime_obj']
@@ -301,3 +301,4 @@ elif st.session_state.current_view == 'search-events':
     search_events_view()
 
 # *** REMOVED THE FAILING LINE: add_new_event(event_data) ***
+
