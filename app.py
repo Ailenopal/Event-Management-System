@@ -108,7 +108,7 @@ def get_events_dataframe(events: List[Dict[str, Any]], sort_by: str = 'date-asc'
     df['#'] = range(1, len(df) + 1) # Add index column for UI
     
     # Only return columns needed for display and the internal ID
-    return df[['#', 'name', 'Date/Time', 'location', 'Attendees', 'Budget (USD)', 'id']]
+    return df[['#', 'name', 'Date/Time', 'location', 'Attendees', 'Budget (PESO)', 'id']]
 
 # --- UI Components (Views) ---
 
@@ -133,7 +133,7 @@ def add_event_view():
         with col_num_1:
             st.number_input("Expected Attendees", min_value=1, value=100, step=1, key="event-attendees")
         with col_num_2:
-            st.number_input("Budget (USD)", min_value=0.0, value=1000.00, step=0.01, format="%.2f", key="event-budget")
+            st.number_input("Budget (PESO)", min_value=0.0, value=1000.00, step=0.01, format="%.2f", key="event-budget")
             
         submitted = st.form_submit_button("Add Event", type="primary", use_container_width=True)
         
@@ -184,7 +184,7 @@ def view_events_view():
             st.markdown("### All Events")
             
             # Prepare columns for the table display
-            display_df = events_df[['#', 'name', 'Date/Time', 'location', 'Attendees', 'Budget (USD)']]
+            display_df = events_df[['#', 'name', 'Date/Time', 'location', 'Attendees', 'Budget (PESO)']]
             
             # Display the table itself (read-only for all columns)
             st.dataframe(
@@ -301,4 +301,5 @@ elif st.session_state.current_view == 'search-events':
     search_events_view()
 
 # *** REMOVED THE FAILING LINE: add_new_event(event_data) ***
+
 
