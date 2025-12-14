@@ -20,6 +20,10 @@ if 'events' not in st.session_state:
 if 'current_view' not in st.session_state:
     st.session_state.current_view = 'add-event' # Default view
 
+# NEW: State to track the last added event for highlighting
+if 'last_added_id' not in st.session_state:
+    st.session_state.last_added_id = None
+
 # --- Utility Functions ---
 
 def generate_unique_id() -> str:
@@ -27,52 +31,69 @@ def generate_unique_id() -> str:
     return str(uuid.uuid4())
 
 def set_view(view_name: str):
-    """Sets the current view in the session state."""
+    """Sets the current view in the session state and clears highlight."""
     st.session_state.current_view = view_name
+    # Clear the highlight state when navigating manually
+    st.session_state.last_added_id = None 
+    st.rerun()
 
-# *** FIXED AND SIMPLIFIED add_new_event ***
+# *** IMPROVED add_new_event for automatic view change and highlight ***
 def add_new_event(event_data: Dict[str, Any]):
     """
-    Adds a new event to the session state.
-    Assumes event_data fields for 'attendees' and 'budget' are already
-    of the correct numeric type from st.number_input.
+    Adds a new event, sets the view to 'view-events', and highlights the new event.
     """
     # Check for required fields again (though form submission logic also checks)
     if not event_data['name'] or not event_data['location']:
         st.error("Event Name and Location are required.")
-        return
+        return False
 
     # Create the datetime object for sorting
     try:
+        # st.time_input returns a time object which gets converted to H:M:S string
         datetime_obj = datetime.strptime(
             f"{event_data['date']} {event_data['time']}", 
-            '%Y-%m-%d %H:%M:%S' # Use %H:%M:%S as st.time_input returns a time object with seconds
+            '%Y-%m-%d %H:%M:%S'
         )
     except ValueError:
         st.error("Error creating event datetime. Check date and time format.")
         return False
         
+    unique_id = generate_unique_id()
+    
     new_event = {
-        'id': generate_unique_id(),
+        'id': unique_id,
         'name': event_data['name'],
         'date': event_data['date'],
         'time': event_data['time'],
         'location': event_data['location'],
-        'attendees': event_data['attendees'], # Directly use the numeric value
-        'budget': event_data['budget'],       # Directly use the numeric value
+        'attendees': event_data['attendees'],
+        'budget': event_data['budget'],
         'datetime_obj': datetime_obj
     }
     
     st.session_state.events.append(new_event)
-    st.success(f"Event '{new_event['name']}' added successfully!")
-    # Streamlit forms handle clearing, but success message needs a rerun
+    
+    # 1. Store the ID for highlighting
+    st.session_state.last_added_id = unique_id
+    
+    # 2. Set the new view
+    st.session_state.current_view = 'view-events'
+    
+    # 3. Show success notification (st.toast is less intrusive than st.success)
+    st.toast(f"Event '{new_event['name']}' added! Navigating to list. 🎉", icon='✅')
+    
     st.rerun() 
+    return True
 
 def delete_event(event_id: str):
     """Deletes an event by ID from the session state."""
     initial_length = len(st.session_state.events)
     st.session_state.events = [event for event in st.session_state.events if event['id'] != event_id]
     
+    # Clear highlight if the deleted event was the last highlighted one
+    if st.session_state.last_added_id == event_id:
+        st.session_state.last_added_id = None
+        
     if len(st.session_state.events) < initial_length:
         st.toast("Event deleted successfully. 🗑️", icon='✅')
         st.rerun() # Rerun to update the displayed list
@@ -150,14 +171,15 @@ def add_event_view():
                 'budget': st.session_state['event-budget'],
             }
             if event_data['name'] and event_data['location']:
-                # The function now handles the rerun to update the UI
+                # The function now handles the rerun and view change
                 add_new_event(event_data)
             else:
                 st.error("Event Name and Location are required.")
 
 
+# *** IMPROVED view_events_view for highlighting ***
 def view_events_view():
-    """Renders the View & Sort Events table."""
+    """Renders the View & Sort Events table, including highlighting."""
     st.markdown("## Manage & Sort Events")
 
     sort_option = st.selectbox(
@@ -179,20 +201,44 @@ def view_events_view():
     if events_df.empty:
         st.info("No events found. Navigate to 'Add Event' to create one.")
     else:
+        # Define the style function to highlight the last added event
+        last_added_id = st.session_state.last_added_id
+        
+        def highlight_new_event(row):
+            """Applies CSS styling to highlight the row of the last added event."""
+            is_new = row['id'] == last_added_id
+            # Streamlit dataframe uses the style property for the whole row (TR)
+            # Use 'background-color' for a clear highlight
+            style = 'background-color: rgba(0, 255, 0, 0.1); border: 2px solid green;' if is_new else ''
+            return [style] * len(row)
+            
+        # Clear the highlight state *after* preparing the highlight function
+        # This allows the highlight to persist across the rerun if the user changes the sort option
+        if last_added_id:
+             # Show a helper message for the highlight
+             st.info(f"The event with ID: **{last_added_id[:8]}...** has been successfully added and is **highlighted in green** below.")
+        
         # Use a container for the table and actions
         with st.container(border=True):
             st.markdown("### All Events")
             
             # Prepare columns for the table display
-            display_df = events_df[['#', 'name', 'Date/Time', 'location', 'Attendees', 'Budget (PESO)']]
+            display_df = events_df[['#', 'name', 'Date/Time', 'location', 'Attendees', 'Budget (PESO)', 'id']]
             
             # Display the table itself (read-only for all columns)
             st.dataframe(
-                display_df,
+                # Use the 'id' column for styling but hide it from the user
+                display_df.style.apply(highlight_new_event, axis=1),
+                column_config={"id": st.column_config.Column(disabled=True, visible=False)},
                 hide_index=True,
-                use_container_width=True
+                use_container_width=True,
             )
             
+            # Clear the highlight after it has been displayed once in the View Events view
+            # This ensures that if the user clicks back to 'Add Event' and then 'View Events', 
+            # the highlight is gone unless a new event was added.
+            st.session_state.last_added_id = None 
+
             st.markdown("---")
             st.markdown("#### Delete Actions")
             
@@ -215,6 +261,9 @@ def view_events_view():
 
 def search_events_view():
     """Renders the Search Events form and results."""
+    # Ensure highlight is clear on manual navigation
+    st.session_state.last_added_id = None 
+    
     st.markdown("## Search Events")
     
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -239,6 +288,7 @@ def search_events_view():
     st.markdown("### Search Results")
 
     # Check the button's state in session state
+    # st.button returns True on click, which is stored in session state if a key is used
     search_clicked = st.session_state.get("execute-search", False) 
     
     # Only run search logic if the button was clicked AND a term is entered
@@ -299,11 +349,3 @@ elif st.session_state.current_view == 'view-events':
     view_events_view()
 elif st.session_state.current_view == 'search-events':
     search_events_view()
-
-# *** REMOVED THE FAILING LINE: add_new_event(event_data) ***
-
-
-
-
-
-
