@@ -177,7 +177,7 @@ def add_event_view():
                 st.error("Event Name and Location are required.")
 
 
-# *** IMPROVED view_events_view for highlighting ***
+# *** FIXED view_events_view for highlighting and removing error ***
 def view_events_view():
     """Renders the View & Sort Events table, including highlighting."""
     st.markdown("## Manage & Sort Events")
@@ -204,16 +204,22 @@ def view_events_view():
         # Define the style function to highlight the last added event
         last_added_id = st.session_state.last_added_id
         
+        # --- Fix 1: Define styling function for the row ---
+        # Note: styling is applied to the row based on the 'id' column, but the 
+        # styling output must have the same length as the displayed columns.
         def highlight_new_event(row):
             """Applies CSS styling to highlight the row of the last added event."""
             is_new = row['id'] == last_added_id
             # Streamlit dataframe uses the style property for the whole row (TR)
             # Use 'background-color' for a clear highlight
             style = 'background-color: rgba(0, 255, 0, 0.1); border: 2px solid green;' if is_new else ''
+            
+            # Since we are using .style.apply(axis=1), we must return a list of styles 
+            # with the same length as the number of columns being styled.
+            # We will style all columns except 'id' (which we remove later).
             return [style] * len(row)
             
         # Clear the highlight state *after* preparing the highlight function
-        # This allows the highlight to persist across the rerun if the user changes the sort option
         if last_added_id:
              # Show a helper message for the highlight
              st.info(f"The event with ID: **{last_added_id[:8]}...** has been successfully added and is **highlighted in green** below.")
@@ -222,21 +228,24 @@ def view_events_view():
         with st.container(border=True):
             st.markdown("### All Events")
             
-            # Prepare columns for the table display
-            display_df = events_df[['#', 'name', 'Date/Time', 'location', 'Attendees', 'Budget (PESO)', 'id']]
+            # Prepare columns for the table display, including 'id' for styling
+            styled_df = events_df[['#', 'name', 'Date/Time', 'location', 'Attendees', 'Budget (PESO)', 'id']]
             
-            # Display the table itself (read-only for all columns)
+            # --- Fix 2: Apply styling ---
+            # Apply the style to the entire styled_df
+            styler = styled_df.style.apply(highlight_new_event, axis=1)
+            
+            # --- Fix 3: Display the DataFrame and hide the 'id' column using column_config ---
+            # Since we are styling the entire row, we need to hide the 'id' column in the final output.
+            # We can use column_config on the Styler object directly in Streamlit 1.25+
             st.dataframe(
-                # Use the 'id' column for styling but hide it from the user
-                display_df.style.apply(highlight_new_event, axis=1),
+                styler,
                 column_config={"id": st.column_config.Column(disabled=True, visible=False)},
                 hide_index=True,
                 use_container_width=True,
             )
             
             # Clear the highlight after it has been displayed once in the View Events view
-            # This ensures that if the user clicks back to 'Add Event' and then 'View Events', 
-            # the highlight is gone unless a new event was added.
             st.session_state.last_added_id = None 
 
             st.markdown("---")
