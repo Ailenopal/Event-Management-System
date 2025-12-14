@@ -297,7 +297,7 @@ with st.sidebar:
     nav_button("Search Events", 'search-events', '🔍')
 
 # Main Content Area
-st.title("Event Management System (Session State)")
+st.title("Event Management")
 st.markdown("---")
 
 # Render the active view based on session state
